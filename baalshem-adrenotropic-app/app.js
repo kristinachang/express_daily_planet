@@ -8,6 +8,7 @@ var app = express();
 
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({extended: true}));
+app.use(methodOverride('_method'));
 
 // Refactor connection and query code
 var db = require("./models");
