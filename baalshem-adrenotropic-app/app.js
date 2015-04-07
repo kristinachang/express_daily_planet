@@ -1,6 +1,8 @@
 var express = require('express');
 var bodyParser = require('body-parser');
 var pg = require("pg");
+var ejs = require('ejs');
+var methodOverride = require('method-override');
 
 var app = express();
 
@@ -11,44 +13,61 @@ app.use(bodyParser.urlencoded({extended: true}));
 var db = require("./models");
 
 app.get('/articles', function(req,res) {
-  console.log("GET /articles");
-  res.send("Set up a response for this route!");
+	db.Article.findAll(
+		{include: [db.Author]})
+		.then(function(articles) {
+			res.render("articles/index", {articlesList: articles});
+	});
 });
 
 app.get('/articles/new', function(req,res) {
-  res.render('articles/new');
+	db.Author.all().then(function(authors) {
+  		res.render('articles/new', {ejsAuthors: authors});
+  	});
 });
 
 app.post('/articles', function(req,res) {
-  console.log(req.body);
-  res.send("Set up a response for this route!");
+	db.Article.create(req.body.article)
+			  .then(function(articles) {
+			  	res.redirect('/articles');
+			  });
 });
 
 app.get('/articles/:id', function(req, res) {
-  res.send("Set up a response for this route!");
-  
-})
+	db.Article.find( {where: {id: req.params.id}, include: [db.Author]})
+			  .then(function(articles) {
+			  	res.render('articles/article', {articleToDisplay: articles});
+	});
+});
+
+// app.put('articles/:id', function(req, res) {
+// 	res.redirect();
+// })
 
 // Fill in these author routes!
 app.get('/authors', function(req, res) {
-	console.log("GET /authors")
-	res.send("Set up a response for this route!");
-
+	db.Author.findAll()
+			 .then(function(authors) {
+			 	res.render('authors/index', {ejsAuthors: authors});
+	});
 });
 
 app.get('/authors/new', function(req, res) {
-	console.log("GET /authors/new")
-	res.send("Set up a response for this route!");
+	res.render('authors/new');
 });
 
 app.post('/authors', function(req, res) {
-	console.log(req.body);
-	res.send("Set up a response for this route!");
+	db.Author.create(req.body.author)
+			  .then(function(authors) {
+			  	res.redirect('/authors');
+	});
 });
 
 app.get('/authors/:id', function(req, res) {
-	console.log("GET /authors/:id")
-	res.send("Set up a response for this route!");
+	db.Author.find({ where: {id: req.params.id}, include: [db.Article]})
+			 .then(function(authors) {
+			 	res.render('authors/author', {ejsAuthor: authors});
+	});
 });
 
 app.get('/', function(req,res) {
@@ -63,7 +82,8 @@ app.get('/contact', function(req,res) {
   res.render('site/contact');
 });
 
-app.listen(3000, function() {
+db.sequelize.sync().then(function() {
+	app.listen(3000, function() {
 	var msg = "* Listening on Port 3000 *";
 
 	// Just for fun... what's going on in this code?
@@ -78,4 +98,6 @@ app.listen(3000, function() {
 	console.log(Array(msg.length + 1).join("*"));
 	console.log(msg);
 	console.log(Array(msg.length + 1).join("*"));
+	}); 
 });
+
