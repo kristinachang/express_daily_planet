@@ -3,17 +3,84 @@ var bodyParser = require('body-parser');
 var pg = require("pg");
 var ejs = require('ejs');
 var methodOverride = require('method-override');
-
+// Refactor connection and query code
+var db = require("./models");
+var session = require("express-session");
 var app = express();
 
 app.set('view engine', 'ejs');
-app.use(bodyParser.urlencoded({extended: true}));
 app.use(methodOverride('_method'));
+app.use(bodyParser.urlencoded({extended: true}));
+app.use(session({
+	secret: 'super secret',
+	resave: false,
+	saveUninitialized: true
+}));
 
-// Refactor connection and query code
-var db = require("./models");
+app.use("/", function (req, res, next) {
 
-app.get('/articles', function(req,res) {
+  req.login = function (user) {
+    req.session.userId = user.id;
+  };
+
+  req.currentUser = function () {
+    return db.User.
+      find({
+        where: {
+          id: req.session.userId
+       }
+      }).
+      then(function (user) {
+        req.user = user;
+        return user;
+      })
+  };
+
+  req.logout = function () {
+    req.session.userId = null;
+    req.user = null;
+  }
+
+  next(); 
+});
+
+app.get("/signup", function(req, res) {
+	res.render("users/signup");
+});
+
+app.post("/users", function(req, res) {
+	var user = req.body.user;
+	db.User
+	  .createSecure(user.email, user.password)
+	  .then(function(user) {
+	  	req.login(user);
+	  	res.redirect("/profile");
+	  });
+});
+
+app.get("/login", function(req, res) {
+	res.render("users/login");
+});
+
+app.post("/login", function(req, res) {
+	var user = req.body.user;
+	db.User
+	  .authenticate(user.email, user.password)
+	  .then(function(user) {
+	  	req.login(user);
+	  	res.redirect("/profile");
+	  });
+});
+
+app.get("/profile", function(req, res) {
+	req.currentUser()
+	   .then(function(user) {
+	   	 res.render("users/profile", {user: user});
+	   });
+});
+
+
+app.get('/articles', function(req, res) {
 	db.Article.findAll(
 		{include: [db.Author]})
 		.then(function(articles) {
@@ -21,13 +88,13 @@ app.get('/articles', function(req,res) {
 	});
 });
 
-app.get('/articles/new', function(req,res) {
+app.get('/articles/new', function(req, res) {
 	db.Author.all().then(function(authors) {
   		res.render('articles/new', {ejsAuthors: authors});
   	});
 });
 
-app.post('/articles', function(req,res) {
+app.post('/articles', function(req, res) {
 	db.Article.create(req.body.article)
 			  .then(function(articles) {
 			  	res.redirect('/articles');
@@ -71,15 +138,15 @@ app.get('/authors/:id', function(req, res) {
 	});
 });
 
-app.get('/', function(req,res) {
+app.get('/', function(req, res) {
   res.render('site/index');
 });
 
-app.get('/about', function(req,res) {
+app.get('/about', function(req, res) {
   res.render('site/about');
 });
 
-app.get('/contact', function(req,res) {
+app.get('/contact', function(req, res) {
   res.render('site/contact');
 });
 
